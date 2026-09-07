@@ -33,11 +33,17 @@ const httpServer = http.createServer((request, response) => {
 
 const dashboardWebSocketServer = new WebSocketServer({ noServer: true });
 const relayWebSocketServer = new WebSocketServer({ noServer: true });
-const allowedRelays = new Set([
-  'wss://relay.deev.is/',
-  'wss://relay.lax1dude.net/',
-  'wss://relay.shhnowisnottheti.me/'
-]);
+
+function isAllowedTarget(target) {
+  if (!target || typeof target !== 'string') return false;
+
+  try {
+    const parsed = new URL(target);
+    return (parsed.protocol === 'ws:' || parsed.protocol === 'wss:');
+  } catch (error) {
+    return false;
+  }
+}
 
 dashboardWebSocketServer.on('connection', (socket) => {
   socket.send('<strong>Connection ready.</strong><br>Waiting for your next WebSocket message.');
@@ -77,9 +83,27 @@ relayWebSocketServer.on('connection', (client, request, target) => {
     }
   });
 
-  upstream.on('error', () => client.close(1011, 'Relay connection failed'));
-  upstream.on('close', (code, reason) => client.close(code, reason));
-  client.on('close', () => upstream.close());
+  upstream.on('error', () => {
+    if (client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING) {
+      client.close(1011, 'Relay connection failed');
+    }
+  });
+
+  upstream.on('close', (code, reason) => {
+    const isValidCloseCode = typeof code === 'number' && Number.isInteger(code) && code >= 1000 && code <= 4999 && code !== 1005 && code !== 1006 && code !== 1015;
+    const normalizedCode = isValidCloseCode ? code : 1000;
+    const normalizedReason = Buffer.isBuffer(reason) ? reason.toString() : (typeof reason === 'string' ? reason : '');
+
+    if (client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING) {
+      client.close(normalizedCode, normalizedReason);
+    }
+  });
+
+  client.on('close', () => {
+    if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
+      upstream.close();
+    }
+  });
 });
 
 httpServer.on('upgrade', (request, socket, head) => {
@@ -87,7 +111,7 @@ httpServer.on('upgrade', (request, socket, head) => {
 
   if (requestUrl.pathname === '/relay') {
     const target = requestUrl.searchParams.get('target');
-    if (!allowedRelays.has(target)) {
+    if (!isAllowedTarget(target)) {
       socket.destroy();
       return;
     }
@@ -102,7 +126,7 @@ httpServer.on('upgrade', (request, socket, head) => {
   });
 });
 
-httpServer.listen(port, () => {
+httpServer.listen(port, '0.0.0.0', () => {
   console.log(`WebSocket tester running at http://localhost:${port}`);
   console.log(`WebSocket endpoint: ws://localhost:${port}`);
 });
