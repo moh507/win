@@ -27,4 +27,10 @@ After updating this file, hard-refresh the page. If the relay screen still shows
 
 The local WebSocket endpoint is only a basic WebSocket test server, while `/relay` forwards Eaglecraft's binary frames to an allowlisted public relay. It is not itself an Eaglecraft relay and cannot replace the public relay service. A basic WebSocket handshake succeeding is not enough to prove that Eaglecraft can use a relay: the client must also complete Eaglecraft's relay protocol, which is why the browser's relay status is the authoritative result.
 
+## Browser backup
+
+The launcher includes a **Download Eagler browser backup** button. Use it while the original browser profile is still available. It saves the `worlds` IndexedDB database and `_eaglercraftX` profile keys into a JSON file. This is a fallback diagnostic backup; use Eagler's native world export from the singleplayer world menu first, because the native EPK/ZIP export produces a normal world directory that can be inspected for `playerdata/` and uploaded after UUID migration.
+
+The backup may contain private world and profile data. Store it securely and do not commit it to GitHub. The relay proxy does not save this data.
+
 Stop the server with `Ctrl+C`.
